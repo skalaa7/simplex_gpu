@@ -8,7 +8,9 @@
 #define NUMOFSLACK 1200
 #define ROWSIZE (NUMOFSLACK+1)
 #define COLSIZE (NUMOFSLACK+NUMOFVAR+1)
-
+using namespace std;
+cl::Buffer buffer_newRow,buffer_pivotColVal, buffer_wv;
+float wv[ROWSIZE*COLSIZE];
 bool checkOptimality(float wv[ROWSIZE*COLSIZE])
 {
     for(int i=0;i<COLSIZE-1;i++)
@@ -138,7 +140,30 @@ void solutions(float wv[ROWSIZE*COLSIZE])
     cout<<""<<endl;
     cout<<endl<<"Optimal solution is "<<wv[(ROWSIZE-1)*COLSIZE+COLSIZE-1]<<endl;
 }
-void simplexCalculate(float wv[ROWSIZE*COLSIZE])
+/*void doPivoting(float wv[ROWSIZE*COLSIZE],int pivotRow,int pivotCol,float pivot,cl::CommandQueue& queue)
+{
+	float newRow[COLSIZE];
+	float pivotColVal[ROWSIZE];
+    for(int i=0;i<COLSIZE;i++)
+        {
+            newRow[i]=wv[pivotRow*COLSIZE+i]/pivot;
+        }
+
+        for(int j=0;j<ROWSIZE;j++)
+        {
+            pivotColVal[j]=wv[j*COLSIZE+pivotCol];
+        }
+	////gpu part
+	queue.enqueueWriteBuffer(buffer_newRow,CL_TRUE,0,sizeof(float) * COLSIZE,newRow);
+	queue.enqueueWriteBuffer(buffer_pivotColVal,CL_TRUE,0,sizeof(float) * ROWSIZE,pivotColVal);
+	queue.enqueueWriteBuffer(buffer_wv,CL_TRUE,0,sizeof(float) * ROWSIZE*COLSIZE,wv);
+	pivot(cl::EnqueueArgs(queue, cl::NDRange(ROWSIZE)),
+	   	   pivotRow, ROWSIZE, COLSIZE, buffer_newRow, buffer_pivotColVal, buffer_wv);
+	queue.finish();
+	cl::copy(queue, buffer_wv, wv, wv+(ROWSIZE-1)*(COLSIZE-1));
+        
+}*/
+/*void simplexCalculate(float wv[ROWSIZE*COLSIZE],cl::CommandQueue& queue)
 {
 
     //float minnegval;
@@ -153,7 +178,6 @@ void simplexCalculate(float wv[ROWSIZE*COLSIZE])
 
     while(!checkOptimality(wv))
     {
-    	count++;
         pivotCol=findPivotCol(wv);
 
         if(isUnbounded(wv,pivotCol))
@@ -164,13 +188,12 @@ void simplexCalculate(float wv[ROWSIZE*COLSIZE])
 
 
         pivotRow=findPivotRow(wv,pivotCol);
-	//cout<<count<<",pivot="<<wv[pivotRow][pivotCol]<<endl;
-        pivot=wv[pivotRow][pivotCol];
-	//s=omp_get_wtime();
+
+        pivot=wv[pivotRow*COLSIZE+pivotCol];
+
     	
-        doPivoting(wv,pivotRow,pivotCol,pivot);
-       // s=omp_get_wtime()-s;
-        //print(wv);
+        doPivoting(wv,pivotRow,pivotCol,pivot,queue);
+
 
     }
     //Ispisivanje rezultata
@@ -185,8 +208,120 @@ void simplexCalculate(float wv[ROWSIZE*COLSIZE])
         solutions(wv);
 
     }
+}*/
+
+
+
+
+int main() {
+	makeMatrix(wv);
+	//////////init_gpu////
+	// get all platforms (drivers), e.g. NVIDIA
+	std::vector<cl::Platform> all_platforms;
+    cl::Platform::get(&all_platforms);
+    if (all_platforms.size()==0) {
+        std::cout<<" No platforms found. Check OpenCL installation!\n";
+        exit(1);
+    }
+    cl::Platform default_platform=all_platforms[0];
+    std::cout << "Using platform: "<<default_platform.getInfo<CL_PLATFORM_NAME>()<<"\n";
+
+    // get default device (CPUs, GPUs) of the default platform
+    std::vector<cl::Device> all_devices;
+    default_platform.getDevices(CL_DEVICE_TYPE_ALL, &all_devices);
+    if(all_devices.size()==0){
+        std::cout<<" No devices found. Check OpenCL installation!\n";
+        exit(1);
+    }
+	// use device[1] because that's a GPU; device[0] is the CPU
+    cl::Device default_device=all_devices[1];
+    std::cout<< "Using device: "<<default_device.getInfo<CL_DEVICE_NAME>()<<"\n";
+	
+	// a context is like a "runtime link" to the device and platform;
+    // i.e. communication is possible
+    cl::Context context({default_device});
+	
+	
+	cl::Program program(context, cl_util::load_prog("pivot.cl"), true);
+    if (program.build({default_device}) != CL_SUCCESS) {
+        std::cout << "Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(default_device) << std::endl;
+        exit(1);
+    }
+	cl::make_kernel<int, int, int, cl::Buffer, cl::Buffer, cl::Buffer> pivoting(program, "pivot");
+	// create a queue (a queue of commands that the GPU will execute)
+    cl::CommandQueue queue(context, default_device);
+	
+    // create buffers on device (allocate space on GPU)
+    buffer_newRow = cl::Buffer(context, CL_MEM_READ_ONLY, sizeof(float) * COLSIZE);
+    buffer_pivotColVal = cl::Buffer(context, CL_MEM_READ_ONLY, sizeof(float) * ROWSIZE);
+    buffer_wv = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(float) * ROWSIZE*COLSIZE);
+	
+	//////main alghorithm
+	//simplexCalculate(wv,queue);
+	int pivotRow;
+    int pivotCol;
+    bool unbounded=false;
+    float pivot;
+
+    //float solVar[NUMOFVAR];
+
+    while(!checkOptimality(wv))
+    {
+        pivotCol=findPivotCol(wv);
+
+        if(isUnbounded(wv,pivotCol))
+        {
+            unbounded=true;
+            break;
+        }
+
+
+        pivotRow=findPivotRow(wv,pivotCol);
+
+        pivot=wv[pivotRow*COLSIZE+pivotCol];
+
+    	
+        //doPivoting(wv,pivotRow,pivotCol,pivot,queue);
+	float newRow[COLSIZE];
+	float pivotColVal[ROWSIZE];
+    for(int i=0;i<COLSIZE;i++)
+        {
+            newRow[i]=wv[pivotRow*COLSIZE+i]/pivot;
+        }
+
+        for(int j=0;j<ROWSIZE;j++)
+        {
+            pivotColVal[j]=wv[j*COLSIZE+pivotCol];
+        }
+	////gpu part
+	queue.enqueueWriteBuffer(buffer_newRow,CL_TRUE,0,sizeof(float) * COLSIZE,newRow);
+	queue.enqueueWriteBuffer(buffer_pivotColVal,CL_TRUE,0,sizeof(float) * ROWSIZE,pivotColVal);
+	queue.enqueueWriteBuffer(buffer_wv,CL_TRUE,0,sizeof(float) * ROWSIZE*COLSIZE,wv);
+	pivoting(cl::EnqueueArgs(queue, cl::NDRange(ROWSIZE)),
+	   	   pivotRow, ROWSIZE, COLSIZE, buffer_newRow, buffer_pivotColVal, buffer_wv);
+	queue.finish();
+	cl::copy(queue, buffer_wv, wv, wv+(ROWSIZE-1)*(COLSIZE-1));
+
+    }
+    //Ispisivanje rezultata
+    if(unbounded)
+    {
+        cout<<"Unbounded"<<endl;
+    }
+    else
+    {
+        //print(wv);
+
+        solutions(wv);
+
+    }
+	
+	
+	return 0;
 }
-void init_gpu
+
+
+/*void init_gpu()
 {
 	// get all platforms (drivers), e.g. NVIDIA
 	std::vector<cl::Platform> all_platforms;
@@ -221,49 +356,5 @@ void init_gpu
         exit(1);
     }
 	cl::make_kernel<int, int, int, cl::Buffer, cl::Buffer, cl::Buffer> pivot(prog, "pivot");
-}
-float wv[ROWSIZE][COLSIZE];
-cl::Buffer buffer_newRow,buffer_pivotColVal, buffer_wv;
-// create a queue (a queue of commands that the GPU will execute)
-    cl::CommandQueue queue(context, default_device);
-void doPivoting(float wv[ROWSIZE*COLSIZE],int pivotRow,int pivotCol,float pivot)
-{
-	float newRow[COLSIZE];
-	float pivotColVal[ROWSIZE];
-    for(int i=0;i<COLSIZE;i++)
-        {
-            newRow[i]=wv[pivotRow*COLSIZE+i]/pivot;
-        }
+}*/
 
-        for(int j=0;j<ROWSIZE;j++)
-        {
-            pivotColVal[j]=wv[j*COLSIZE+pivotCol];
-        }
-	////gpu part
-	queue.enqueueWriteBuffer(buffer_newRow,CL_TRUE,0,sizeof(float) * COLSIZE,newRow);
-	queue.enqueueWriteBuffer(buffer_pivotColVal,CL_TRUE,0,sizeof(float) * ROWSIZE,pivotColVal);
-	queue.enqueueWriteBuffer(buffer_wv,CL_TRUE,0,sizeof(float) * ROWSIZE*COLSIZE,wv);
-	pivot(cl::EnqueueArgs(queue, cl::NDRange(ROWSIZE)),
-	   	   pivotRow, ROWSIZE, COLSIZE, buffer_newRow, buffer_pivotColVal, buffer_wv);
-	queue.finish();
-	cl::copy(queue, buffer_wv, wv, wv+(ROWSIZE-1)*(COLSIZE-1));
-        
-}
-int main() {
-	init_gpu();
-	makeMatrix(wv);
-	
-	
-    // create buffers on device (allocate space on GPU)
-    buffer_newRow = cl::Buffer(context, CL_MEM_READ_ONLY, sizeof(float) * COLSIZE);
-    buffer_pivotColVal = cl::Buffer(context, CL_MEM_READ_ONLY, sizeof(float) * ROWSIZE);
-    buffer_wv = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(float) * ROWSIZE*COLSIZE);
-	
-	
-	//main alghorithm
-	simplexCalculate(wv);
-	
-	
-	
-	return 0;
-}
