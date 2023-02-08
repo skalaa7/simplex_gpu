@@ -7,7 +7,7 @@ CCFLAGS=-O3 -ffast-math
 
 LIBS = -lm -lOpenCL -fopenmp
 
-MMUL_OBJS = simplex_gpu.o cl_util.o
+MMUL_OBJS = matmul.o cl_util.o matrix.o
 EXEC = mult
 
 all: $(EXEC)

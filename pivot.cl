@@ -8,21 +8,25 @@ __kernel void pivot(
 {
     int i;
     int j = get_global_id(0);
-	if(j<ROWSIZE)
-	{
+    //printf("j=%d\n",j);
+    if(j<ROWSIZE)
+    {
 	if(j==pivotRow)
         {
             for(int i=0;i<COLSIZE;i++)
             {
                 wv[j*COLSIZE+i]=newRow[i];
+                
             }
         }
-    else
-    {
-        for(int i=0;i<COLSIZE;i++)
+        else
         {
-            wv[j*COLSIZE+i]=wv[j*COLSIZE+i]-newRow[i]*pivotColVal[j];
+            for(int i=0;i<COLSIZE;i++)
+            {
+                wv[j*COLSIZE+i]=wv[j*COLSIZE+i]-newRow[i]*pivotColVal[j];
+                //printf("%d,%d,%f",j,i,wv[j*COLSIZE+i]);
+            }
         }
     }
-	}
+    //printf("\n");
 }
