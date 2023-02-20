@@ -5,8 +5,8 @@
 #include <CL/cl.hpp>
 #include <iostream>
 #include <fstream>
-#define NUMOFVAR 1200
-#define NUMOFSLACK 1200
+#define NUMOFVAR 500
+#define NUMOFSLACK 500
 #define ROWSIZE (NUMOFSLACK+1)
 #define COLSIZE (NUMOFSLACK+NUMOFVAR+1)
 using namespace std;
@@ -55,7 +55,7 @@ void makeMatrix(float wv[ROWSIZE*COLSIZE])
 		}
 	}
 	fstream myFile;
-    myFile.open("baza1202.txt",ios::in); //otvaram fajl u read modu
+    myFile.open("baza500.txt",ios::in); //otvaram fajl u read modu
 	if(myFile.is_open())
     {
         for(int j = 0; j < ROWSIZE; j++)
@@ -380,18 +380,31 @@ int main(int argc, char *argv[])
 	cout << "------------------------------------------------------------" << endl;
 	cout << "-- Results                                                --" << endl;
 	cout << "------------------------------------------------------------" << endl;
+	cout<<"Matrix size:"<<NUMOFVAR<<"x"<<NUMOFSLACK<< endl;
 	int equal=1;
-	if(optim[0]!=optim[1])
+	float error=0.001;
+	float rel_error=(1.0-optim[1]/optim[0]);
+	int var_mismatch_count=0;
+	if(abs(rel_error)>error)
 		equal=0;
-	cout<<"Optimal solutions:"<<optim[0]<<","<<optim[1]<<endl;
-	cout<<"Iterations:"<<count[0]<<","<<count[1]<<endl;
-		/*for(int v=0;v<NUMOFVAR;v++)
-		{	//cout<<var[v]<<","<<var[NUMOFVAR+v]<<endl;
-			if(var[v]!=var[NUMOFVAR+v])
-			{	cout<<var[v]<<","<<var[NUMOFVAR+v]<<endl; equal=0;}
-		}*/			
-	cout<<"Equal="<<equal<<endl;
-	cout<<"Time elapsed = "<<elapsed2<<"s, sequential time = "<<elapsed1<<"s, speedup ="<<elapsed1/elapsed2<<"times"<<endl;
+	cout<<"Optimal solutions - seq:"<<optim[0]<<", gpu:"<<optim[1]<<endl;
+	cout<<"Relative error:"<<rel_error*100<<"%"<<", error margin = "<<error*100<<"%"<<endl;
+	
+	/*for(int v=0;v<NUMOFVAR;v++)
+	{	//cout<<var[v]<<","<<var[NUMOFVAR+v]<<endl;
+		if(abs(1-var[NUMOFVAR+v]/var[v])>0.001)
+			var_mismatch_count++;
+		{	//cout<<var[v]<<","<<var[NUMOFVAR+v]<<endl; 
+		//equal=0;
+		}
+	}*/
+	if(equal)
+		cout<<"--Results match--"<<endl;			
+	else
+		cout<<"Results don't match"<<endl;
+	//cout<<"Number of matched variables: "<<NUMOFVAR-var_mismatch_count<<" out of "<<NUMOFVAR<<endl;
+	cout<<"Iterations - seq:"<<count[0]<<", gpu:"<<count[1]<<endl;
+	cout<<"Time elapsed on gpu = "<<elapsed2<<"s, sequential time = "<<elapsed1<<"s"<<endl; 		cout<<"speedup = seq_time/gpu_time = "<<elapsed1/elapsed2<<endl;
 	  /*
 	   * OpenCL row on work item, A in privete memory
 	   */
