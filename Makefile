@@ -7,12 +7,12 @@ CCFLAGS=-O3 -ffast-math
 
 LIBS = -lm -lOpenCL -fopenmp
 
-MMUL_OBJS = matmul.o cl_util.o matrix.o
-EXEC = mult
+MMUL_OBJS = simplex.o cl_util.o matrix.o
+EXEC = simplex
 
 all: $(EXEC)
 
-mult: $(MMUL_OBJS)
+simplex: $(MMUL_OBJS)
 	$(CPPC) $(MMUL_OBJS) $(CCFLAGS) $(LIBS) -o $(EXEC)
 
 .cpp.o:
