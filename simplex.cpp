@@ -5,8 +5,8 @@
 #include <CL/cl.hpp>
 #include <iostream>
 #include <fstream>
-#define NUMOFVAR 1600
-#define NUMOFSLACK 1600
+#define NUMOFVAR 1000
+#define NUMOFSLACK 1000
 #define ROWSIZE (NUMOFSLACK+1)
 #define COLSIZE (NUMOFSLACK+NUMOFVAR+1)
 using namespace std;
@@ -31,7 +31,7 @@ bool checkOptimality(float wv[ROWSIZE*COLSIZE])
 {
     for(int i=0;i<COLSIZE-1;i++)
     {
-        if(wv[(ROWSIZE-1)*COLSIZE+i]<0)//min> max<
+        if(wv[(ROWSIZE-1)*COLSIZE+i]<0)
             return false;
     }
     return true;
@@ -55,7 +55,7 @@ void makeMatrix(float wv[ROWSIZE*COLSIZE])
 		}
 	}
 	fstream myFile;
-    myFile.open("baza1600.txt",ios::in); //open in read mode
+    myFile.open("baza1000.txt",ios::in); //open in read mode
 	if(myFile.is_open())
     {
         for(int j = 0; j < ROWSIZE; j++)
@@ -229,7 +229,7 @@ void simplexCalculate(float wv[ROWSIZE*COLSIZE])
 
 
     }
-    //Ispisivanje rezultata
+    //Writing results
     if(unbounded)
     {
         cout<<"Unbounded"<<endl;
@@ -350,13 +350,14 @@ int main(int argc, char *argv[])
 	queue.enqueueWriteBuffer(b_wv,CL_TRUE,0,sizeof(float) * ROWSIZE*COLSIZE,wv);
 	pivoting(cl::EnqueueArgs(queue, cl::NDRange(ROWSIZE)),
 	   	   pivotRow, ROWSIZE, COLSIZE, b_newRow, b_pivotColVal, b_wv);
+	
 	queue.finish();
-
 	cl::copy(queue, b_wv, wv, wv+(ROWSIZE-1)*COLSIZE+(COLSIZE));
 	//print(wv);
 	//while(1);
     }
-    //Ispisivanje rezultata
+    
+    //Write results
     if(unbounded)
     {
         cout<<"Unbounded"<<endl;
